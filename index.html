@@ -11,7 +11,7 @@
 <style>
   body {
     font-family: 'Arial', sans-serif;
-    background-color: #f9f9f9;
+    background-color: #a4a3ff;
     padding: 20px;
     line-height: 1.6;
     color: #333;
@@ -24,7 +24,7 @@
   form {
     max-width: 900px;
     margin: 0 auto;
-    background: #fff;
+    background: #5dc1f0;
     padding: 20px;
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.1);
@@ -40,6 +40,7 @@
   input[type="date"],
   input[type="tel"],
   select {
+     background-color: #ffc3a0;
     padding: 10px;
     font-size: 16px;
     border: 1px solid #ccc;
@@ -86,7 +87,7 @@
     margin-top: 10px;
   }
   #itemsTable th {
-    background-color: #ecf0f1;
+    background-color: #a2e91e;
     font-weight: 600;
   }
   #itemsTable th,
@@ -137,11 +138,11 @@
   </label>
   <label>
     <p>Адрес:</p>
-    <input type="text" id="address" placeholder="Новотрактовая, 13" />
+    <input type="text" id="address" placeholder="Новотрактовая, 157" />
   </label>
   <label>
     <p>Телефон заказчика:</p>
-    <input type="tel" id="customerPhone" placeholder="8-900-00-00" />
+    <input type="tel" id="customerPhone" placeholder="8-(900)-000-00-00" />
   </label>
 
   <h3>Добавить позиции товаров/услуг</h3>
@@ -162,6 +163,7 @@
         <option value="">Выберите единицу</option>
         <option value="т">т</option>
         <option value="м3">м3</option>
+        <option value="шт">шт</option>
       </select>
     </label>
     <label>
@@ -259,6 +261,21 @@ function removeItem(index) {
   renderItems();
 }
 
+function createDashedLine() {
+  return new Paragraph({
+    border: {
+      top: {
+        style: 'dashed',
+        size: 4,
+        color: '000000',
+      },
+      bottom: { style: 'none' },
+      left: { style: 'none' },
+      right: { style: 'none' },
+    },
+  });
+}
+
 function createWord() {
   const serviceName = document.getElementById('serviceName').value.trim();
   const dateStr = document.getElementById('date').value;
@@ -291,25 +308,13 @@ function createWord() {
 
   // Позиции товаров/услуг
   items.forEach((item, index) => {
-    tableRows.push({
-      number: index + 1,
-      material: item.material,
-      qty: item.qty,
-      unit: item.unit,
-      amount: item.amount,
-    });
+    tableRows.push({ number: index + 1, material: item.material, qty: item.qty, unit: item.unit, amount: item.amount });
     totalAmount += item.amount;
   });
 
   // Основной товар/услуга
   if (serviceName && (quantity || amount)) {
-    tableRows.push({
-      number: items.length + 1,
-      material: serviceName,
-      qty: quantity,
-      unit: unit,
-      amount: amount,
-    });
+    tableRows.push({ number: items.length + 1, material: serviceName, qty: quantity, unit: unit, amount: amount });
     totalAmount += amount;
   }
 
@@ -325,8 +330,7 @@ function createWord() {
       {
         children: [
           section1,
-          // Штрихпунктирная линия
-          new Paragraph({ children: [new TextRun({ text: '──────────────────────────────────────────────', size: 20, color: '999999' })], spacing: { after: 300 } }),
+          createDashedLine(),
           section2,
         ],
       },
@@ -347,16 +351,24 @@ function createContractSection({ tableRows, totalAmount, totalWithDiscount, disc
 
   const table = createTable(tableRows);
 
+  // Создаем строки с итогами
+  const sumText = new Paragraph({ text: `Общая сумма: ${totalAmount.toFixed(2)} руб.` });
+  const discountText = discount ? new Paragraph({ text: `Скидка 5%: -${discountAmount.toFixed(2)} руб.` }) : null;
+  const totalWithDiscountText = new Paragraph({ text: `Итоговая сумма: ${totalWithDiscount.toFixed(2)} руб.` });
+
   return new Paragraph({
     children: [
-      new TextRun({ text: ' ☎ 8 342 246 12 09  🌐Самосвальщик.РФ                             ☎ 8 342 271 81 41\n  ✉ Samosvalchikf@gmail.com\n', break: 0, size: 18 }),
-      new TextRun({ text: '                                                           ', break: 0, size: 18 }),
+      new TextRun({ text: '       ☎ 8 342 246 12 09  🌐Самосвальщик.РФ                        ☎ 8 342 271 81 41\n  ✉ Samosvalchikf@gmail.com\n', break: 0, size: 18 }),
       new TextRun({ text: `                                                        АКТ № 1 ОТ ${day} ${monthLong} ${year} г.`, bold: true, break: 2 , size: 20 }),
       new TextRun({ text: 'Исполнитель ИП Михайлов Александр Андреевич\n', break: 1 , size: 20}),
       new TextRun({ text: 'ИНН 590613985887 ОГРНИП 305590609000010 тел.271-81-41', break: 1 , size: 20 }),
-      new TextRun({ text: `Заказчик: ${customer}, Адрес: ${address}, Телефон: ${customerPhone}` }),
+       new TextRun({ text: ' '.repeat(50) }),
+      new TextRun({ text: `                     Заказчик: ${customer}, Адрес: ${address}, Телефон: ${customerPhone}` }),
       new Paragraph({ text: "" }),
       table,
+      sumText,
+      ...(discount ? [discountText] : []),
+      totalWithDiscountText,
       new Paragraph({ text: "", break: 2 }),
       new Paragraph({ text: 'Вышеперечисленные услуги выполнены полностью и в срок. Заказчик претензий по объему, качеству и срокам оказания услуг не имеет.', break: 1 }),
       new Paragraph({ text: "" }),
@@ -367,9 +379,8 @@ function createContractSection({ tableRows, totalAmount, totalWithDiscount, disc
           new TextRun({ text: 'ИСПОЛНИТЕЛЬ                                                                                                 ЗАКАЗЧИК  ', bold: true }),
         ],
       }),
-     new Paragraph({ children: [new TextRun({ text: "ЛОГИСТ", bold: true })], }),
+      new Paragraph({ children: [new TextRun({ text: "ЛОГИСТ", bold: true })], }),
       new Paragraph({ text: "" }),
-    
       new Paragraph({ text: "*Просим ответить на вопрос:", break: 1, bold: true  }),
       new Paragraph({ children: [new TextRun({ text: 'Откуда узнали о нашей компании?      ______________________________________________________ ' , bold: true })] }),
       new Paragraph({ text: 'Перевод 8-908-271-81-41 Александр Андреевич М.(Сбербанк)', break: 2, size: 15, bold: true  }),
@@ -377,6 +388,7 @@ function createContractSection({ tableRows, totalAmount, totalWithDiscount, disc
   });
 }
 
+// Создает таблицу с позициями
 function createTable(rowsData) {
   const rows = [];
 
@@ -408,7 +420,7 @@ function createTable(rowsData) {
     );
   });
 
-  // Итоговая строка
+  // Итоговая строка суммы
   const totalSum = rowsData.reduce((sum, r) => sum + r.amount, 0);
   rows.push(
     new TableRow({
