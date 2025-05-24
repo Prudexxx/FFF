@@ -78,7 +78,7 @@
     padding: 15px;
     border-radius: 8px;
     margin-top: 10px;
-    transition: all 0.3s;
+    display: none;
   }
   #itemsTable {
     width: 100%;
@@ -107,7 +107,7 @@
 <h1>Создать договор</h1>
 <form id="contractForm" onsubmit="return false;">
   <label>
-    <p>Наим услуги:</p>
+    <p>Наименование услуги:</p>
     <input type="text" id="serviceName" placeholder="Наименование услуги" />
   </label>
   <label>
@@ -115,7 +115,7 @@
     <input type="date" id="date" />
   </label>
   <label>
-    <p>Кол-во:</p>
+    <p>Количество:</p>
     <input type="number" id="quantity" min="0" />
   </label>
   <label>
@@ -147,13 +147,13 @@
   <h3>Добавить позиции товаров/услуг</h3>
   <button type="button" onclick="showAddItemForm()">Добавить товар/услугу</button>
 
-  <div id="additionalItemForm" style="display:none;">
+  <div id="additionalItemForm">
     <label>
       <p>Материал:</p>
       <input type="text" id="extraServiceName" placeholder="Наименование" style="width:70%; display:inline-block;"/>
     </label>
     <label>
-      <p>Кол-во:</p>
+      <p>Количество:</p>
       <input type="number" id="extraQuantity" min="0" style="width:70%; display:inline-block;"/>
     </label>
     <label>
@@ -188,7 +188,7 @@
   </div>
 
   <label style="margin-top:15px; display:flex; align-items:center; justify-content:space-around;">
-    <input type="checkbox" id="discountCheckbox" onchange="updatePreview()">
+    <input type="checkbox" id="discountCheckbox">
     <span style="margin-left:8px;">5% скидка при предоставлении карты №</span>
   </label>
 
@@ -272,7 +272,9 @@ function createWord() {
   const customerPhone = document.getElementById('customerPhone').value.trim();
   const discount = document.getElementById('discountCheckbox').checked;
 
-  if (!dateStr && items.length === 0 && !serviceName && !customer && !address && !customerPhone) {
+  if (
+    !dateStr && items.length === 0 && !serviceName && !customer && !address && !customerPhone
+  ) {
     alert('Пожалуйста, введите хотя бы один из обязательных элементов или добавьте позиции.');
     return;
   }
@@ -283,157 +285,145 @@ function createWord() {
   const year = dateObj.getFullYear();
 
   let totalAmount = 0;
-  let itemsRows = '';
 
-  // Формируем строки товаров
+  // Создаем таблицу с позициями
+  const tableRows = [];
+
+  // Позиции товаров/услуг
   items.forEach((item, index) => {
-    if (item.material || item.qty || item.amount) {
-      itemsRows += `
-        <tr>
-          <td>${index + 1}</td>
-          <td>${item.material}</td>
-          <td>${item.qty}</td>
-          <td>${item.unit}</td>
-          <td>${item.amount.toFixed(2)}</td>
-        </tr>
-      `;
-      totalAmount += item.amount;
-    }
+    tableRows.push({
+      number: index + 1,
+      material: item.material,
+      qty: item.qty,
+      unit: item.unit,
+      amount: item.amount,
+    });
+    totalAmount += item.amount;
   });
 
-  // Добавляем основной товар/услугу
+  // Основной товар/услуга
   if (serviceName && (quantity || amount)) {
-    itemsRows += `
-      <tr>
-        <td>${items.length + 1}</td>
-        <td>${serviceName}</td>
-        <td>${quantity}</td>
-        <td>${unit}</td>
-        <td>${amount.toFixed(2)}</td>
-      </tr>
-    `;
+    tableRows.push({
+      number: items.length + 1,
+      material: serviceName,
+      qty: quantity,
+      unit: unit,
+      amount: amount,
+    });
     totalAmount += amount;
   }
 
-  // Расчет скидки
-  let discountAmount = 0;
-  if (discount) {
-    discountAmount = totalAmount * 0.05;
-  }
+  const discountAmount = discount ? totalAmount * 0.05 : 0;
   const totalWithDiscount = totalAmount - discountAmount;
 
-  // Создаем документ
-  const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell } = window.docx;
+  // Создаём два блока с договором
+  const section1 = createContractSection({ tableRows, totalAmount, totalWithDiscount, discount, discountAmount, customer, address, customerPhone, dateStr });
+  const section2 = createContractSection({ tableRows, totalAmount, totalWithDiscount, discount, discountAmount, customer, address, customerPhone, dateStr });
 
   const doc = new Document({
-    sections: [{
-      children: [
-        new Paragraph({ children: [new TextRun({ text: '                                                                                                                   ☎ 8 342 271 81 41\n  ✉ Samosvalchikf@gmail.com\n', break: 0, size: 18 })] }),
-        new Paragraph({ children: [new TextRun({ text: '                                                                                                                   ☎ 8 342 246 12 09  🌐Самосвальщик.РФ', break: 0, size: 18 })] }),
-        new Paragraph({
-          children: [
-            new TextRun({ text: `АКТ № 1 ОТ ${day} ${monthLong} ${year} г.`, bold: true, break: 2 , size: 20 }),
-          ],
-        }),
-        new Paragraph({
-          children: [
-            new TextRun({ text: 'Исполнитель ИП Михайлов Александр Андреевич\n', break: 1 , size: 18}),
-            new TextRun({ text: 'ИНН 590613985887 ОГРНИП 305590609000010 тел.271-81-41', break: 1 , size: 18 }),
-          ],
-        }),
-        new Paragraph({ text: `Заказчик: ${customer}, Адрес: ${address}, Телефон: ${customerPhone}` }),
-        new Paragraph({ text: "" }),
-        // Таблица шириной на всю страницу с отступами
-        new Table({
-          rows: [
-            new TableRow({
-              children: [
-                new TableCell({ children: [new Paragraph({ text: '№', bold: true })], width: { size: 10, type: 'pct' } }),
-                new TableCell({ children: [new Paragraph({ text: 'Наим', bold: true })], width: { size: 35, type: 'pct' } }),
-                new TableCell({ children: [new Paragraph({ text: 'Кол-во', bold: true })], width: { size: 15, type: 'pct' } }),
-                new TableCell({ children: [new Paragraph({ text: 'Ед', bold: true })], width: { size: 15, type: 'pct' } }),
-                new TableCell({ children: [new Paragraph({ text: 'Сумма', bold: true })], width: { size: 25, type: 'pct' } }),
-              ],
-            }),
-            ...items.map((item, i) =>
-              new TableRow({
-                children: [
-                  new TableCell({ children: [new Paragraph((i + 1).toString())], width: { size: 10, type: 'pct' } }),
-                  new TableCell({ children: [new Paragraph(item.material)], width: { size: 35, type: 'pct' } }),
-                  new TableCell({ children: [new Paragraph(item.qty.toString())], width: { size: 15, type: 'pct' } }),
-                  new TableCell({ children: [new Paragraph(item.unit)], width: { size: 15, type: 'pct' } }),
-                  new TableCell({ children: [new Paragraph(item.amount.toFixed(2))], width: { size: 25, type: 'pct' } }),
-                ],
-              })
-            ),
-            ...(serviceName ? [
-              new TableRow({
-                children: [
-                  new TableCell({ children: [new Paragraph((items.length + 1).toString())], width: { size: 10, type: 'pct' } }),
-                  new TableCell({ children: [new Paragraph(serviceName)], width: { size: 35, type: 'pct' } }),
-                  new TableCell({ children: [new Paragraph(quantity.toString())], width: { size: 15, type: 'pct' } }),
-                  new TableCell({ children: [new Paragraph(unit)], width: { size: 15, type: 'pct' } }),
-                  new TableCell({ children: [new Paragraph(amount.toFixed(2))], width: { size: 25, type: 'pct' } }),
-                ],
-              }),
-            ] : []),
-            // Итоговая сумма без скидки
-            new TableRow({
-              children: [
-                new TableCell({ children: [new Paragraph('')], width: { size: 10, type: 'pct' } }),
-                new TableCell({ children: [new Paragraph('Общая сумма без скидки и НДС:')], width: { size: 35, type: 'pct' } }),
-                new TableCell({ children: [new Paragraph('')], width: { size: 15, type: 'pct' } }),
-                new TableCell({ children: [new Paragraph('')], width: { size: 15, type: 'pct' } }),
-                new TableCell({ children: [new Paragraph(`${totalAmount.toFixed(2)}`)], width: { size: 25, type: 'pct' } }),
-              ],
-            }),
-            ...(discount ? [
-              new TableRow({
-                children: [
-                  new TableCell({ children: [new Paragraph('')], width: { size: 10, type: 'pct' } }),
-                  new TableCell({ children: [new Paragraph('Скидка 5%:')], width: { size: 35, type: 'pct' } }),
-                  new TableCell({ children: [new Paragraph('')], width: { size: 15, type: 'pct' } }),
-                  new TableCell({ children: [new Paragraph('')], width: { size: 15, type: 'pct' } }),
-                  new TableCell({ children: [new Paragraph(`-${discountAmount.toFixed(2)}`)], width: { size: 25, type: 'pct' } }),
-                ],
-              }),
-            ] : []),
-            // Итог с учетом скидки
-            new TableRow({
-              children: [
-                new TableCell({ children: [new Paragraph('')], width: { size: 10, type: 'pct' } }),
-                new TableCell({ children: [new Paragraph('Итого:')], width: { size: 35, type: 'pct' } }),
-                new TableCell({ children: [new Paragraph('')], width: { size: 15, type: 'pct' } }),
-                new TableCell({ children: [new Paragraph('')], width: { size: 15, type: 'pct' } }),
-                new TableCell({ children: [new Paragraph(`${totalWithDiscount.toFixed(2)}`)], width: { size: 25, type: 'pct' } }),
-              ],
-            }),
-          ],
-        }),
-        // Строка с ФИО, адресом и телефоном
-        new Paragraph({ text: 'Вышеперечисленные услуги выполнены полностью и в срок. Заказчик претензий по объему, качеству и срокам оказания услуг не имеет.', break: 1}),
-        new Paragraph({ text: "" }),
-        // подписи
-        new Paragraph({
-          children: [
-            new TextRun({ text: 'ВОДИТЕЛЬ,ИСПОЛНИТЕЛЬ, ЛОГИСТ     __________________________________________________ ', break: 1 }),
-            new TextRun({ text: ' '.repeat(50) }),
-            new TextRun({ text: 'ЗАКАЗЧИК   __________________________________________________ ', break: 1 }),
-          ],
-        }),
-        new Paragraph({ text: "*Просим ответить на вопрос:", break: 1 }),
-        new Paragraph({ children: [new TextRun({ text: 'Откуда узнали о нашей компании?      __________________________________________________ ', break: 0 })] }),
-        new Paragraph({ text: 'Перевод 8-908-271-81-41 Александр Андреевич М.(Сбербанк)' }),
-      ],
-    }],
+    sections: [
+      {
+        children: [
+          section1,
+          // Штрихпунктирная линия
+          new Paragraph({ children: [new TextRun({ text: '──────────────────────────────────────────────', size: 20, color: '999999' })], spacing: { after: 300 } }),
+          section2,
+        ],
+      },
+    ],
   });
 
-  // Генерируем файл
   Packer.toBlob(doc).then(blob => {
     saveAs(blob, "договор.docx");
   });
 }
-</script>
 
+// Создает секцию договора
+function createContractSection({ tableRows, totalAmount, totalWithDiscount, discount, discountAmount, customer, address, customerPhone, dateStr }) {
+  const dateObj = dateStr ? new Date(dateStr) : new Date();
+  const day = dateObj.getDate();
+  const monthLong = dateObj.toLocaleString('ru', { month: 'long' });
+  const year = dateObj.getFullYear();
+
+  const table = createTable(tableRows);
+
+  return new Paragraph({
+    children: [
+      new TextRun({ text: ' ☎ 8 342 246 12 09  🌐Самосвальщик.РФ                             ☎ 8 342 271 81 41\n  ✉ Samosvalchikf@gmail.com\n', break: 0, size: 18 }),
+      new TextRun({ text: '                                                           ', break: 0, size: 18 }),
+      new TextRun({ text: `                                                        АКТ № 1 ОТ ${day} ${monthLong} ${year} г.`, bold: true, break: 2 , size: 20 }),
+      new TextRun({ text: 'Исполнитель ИП Михайлов Александр Андреевич\n', break: 1 , size: 20}),
+      new TextRun({ text: 'ИНН 590613985887 ОГРНИП 305590609000010 тел.271-81-41', break: 1 , size: 20 }),
+      new TextRun({ text: `Заказчик: ${customer}, Адрес: ${address}, Телефон: ${customerPhone}` }),
+      new Paragraph({ text: "" }),
+      table,
+      new Paragraph({ text: "", break: 2 }),
+      new Paragraph({ text: 'Вышеперечисленные услуги выполнены полностью и в срок. Заказчик претензий по объему, качеству и срокам оказания услуг не имеет.', break: 1 }),
+      new Paragraph({ text: "" }),
+      new Paragraph({
+        children: [
+          new TextRun({ text: 'ВОДИТЕЛЬ _______________________________    ___________________________________________', break: 1, bold: true }),
+          new TextRun({ text: ' '.repeat(50) }),
+          new TextRun({ text: 'ИСПОЛНИТЕЛЬ                                                                                                 ЗАКАЗЧИК  ', bold: true }),
+        ],
+      }),
+     new Paragraph({ children: [new TextRun({ text: "ЛОГИСТ", bold: true })], }),
+      new Paragraph({ text: "" }),
+    
+      new Paragraph({ text: "*Просим ответить на вопрос:", break: 1, bold: true  }),
+      new Paragraph({ children: [new TextRun({ text: 'Откуда узнали о нашей компании?      ______________________________________________________ ' , bold: true })] }),
+      new Paragraph({ text: 'Перевод 8-908-271-81-41 Александр Андреевич М.(Сбербанк)', break: 2, size: 15, bold: true  }),
+    ],
+  });
+}
+
+function createTable(rowsData) {
+  const rows = [];
+
+  // Заголовок
+  rows.push(
+    new TableRow({
+      children: [
+        new TableCell({ children: [new Paragraph({ text: '№', bold: true })], width: { size: 10, type: 'pct' } }),
+        new TableCell({ children: [new Paragraph({ text: 'Наим', bold: true })], width: { size: 35, type: 'pct' } }),
+        new TableCell({ children: [new Paragraph({ text: 'Кол-во', bold: true })], width: { size: 15, type: 'pct' } }),
+        new TableCell({ children: [new Paragraph({ text: 'Ед', bold: true })], width: { size: 15, type: 'pct' } }),
+        new TableCell({ children: [new Paragraph({ text: 'Сумма', bold: true })], width: { size: 25, type: 'pct' } }),
+      ],
+    })
+  );
+
+  // Строки позиций
+  rowsData.forEach((row) => {
+    rows.push(
+      new TableRow({
+        children: [
+          new TableCell({ children: [new Paragraph(row.number.toString())], width: { size: 10, type: 'pct' } }),
+          new TableCell({ children: [new Paragraph(row.material)] }, { width: { size: 35, type: 'pct' } }),
+          new TableCell({ children: [new Paragraph(row.qty.toString())] }, { width: { size: 15, type: 'pct' } }),
+          new TableCell({ children: [new Paragraph(row.unit)] }, { width: { size: 15, type: 'pct' } }),
+          new TableCell({ children: [new Paragraph(row.amount.toFixed(2))] }, { width: { size: 25, type: 'pct' } }),
+        ],
+      })
+    );
+  });
+
+  // Итоговая строка
+  const totalSum = rowsData.reduce((sum, r) => sum + r.amount, 0);
+  rows.push(
+    new TableRow({
+      children: [
+        new TableCell({ children: [new Paragraph('')], width: { size: 10, type: 'pct' } }),
+        new TableCell({ children: [new Paragraph('Общая сумма без скидки и НДС:')], width: { size: 35, type: 'pct' } }),
+        new TableCell({ children: [new Paragraph('')], width: { size: 15, type: 'pct' } }),
+        new TableCell({ children: [new Paragraph('')], width: { size: 15, type: 'pct' } }),
+        new TableCell({ children: [new Paragraph(totalSum.toFixed(2))] }, { width: { size: 25, type: 'pct' } }),
+      ],
+    })
+  );
+
+  return new Table({ rows });
+}
+</script>
 </body>
-</html> 
+</html>
