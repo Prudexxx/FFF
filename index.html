@@ -363,15 +363,8 @@ function removeItem(index) {
 }
 
 function createDashedLine() {
-  return new Paragraph({
-    border: {
-      top: {
-        style: 'dashed',
-        size: 4,
-        color: '000000',
-      },
-    },
-  });
+  // Убираем штрихпунктирную линию, оставляем пустой параграф
+  return new Paragraph({});
 }
 
 function createWord() {
